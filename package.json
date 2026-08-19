@@ -1,0 +1,50 @@
+{
+  "name": "karya",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:push": "drizzle-kit push",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "tsx --conditions=react-server --env-file=.env src/server/db/seed.ts",
+    "setup": "npm run db:push && npm run db:seed",
+    "db:reconcile": "tsx --conditions=react-server --env-file=.env src/server/scripts/reconcile.ts",
+    "reset-password": "tsx --conditions=react-server --env-file=.env src/server/scripts/reset-password.ts"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
+    "drizzle-orm": "^0.45.2",
+    "jose": "^5.9.6",
+    "lucide-react": "^0.469.0",
+    "next": "^15.1.4",
+    "pg": "^8.23.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "recharts": "^2.15.0",
+    "server-only": "^0.0.1",
+    "tailwind-merge": "^2.6.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^22.10.5",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19.0.5",
+    "@types/react-dom": "^19.0.2",
+    "drizzle-kit": "^0.31.10",
+    "tailwindcss": "^4.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}

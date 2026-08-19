@@ -1,0 +1,1 @@
+ALTER TABLE "payments" ADD COLUMN "linked_payment_id" uuid;
