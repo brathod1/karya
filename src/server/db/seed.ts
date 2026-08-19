@@ -32,6 +32,29 @@ function daysFromNow(n: number) {
 }
 
 async function main() {
+  /**
+   * Demo data is for showing the application to someone who has never seen it.
+   * It has no place in a database that is running a real business, so this
+   * refuses to run when it finds one — and refuses outright in production.
+   */
+  if (process.env.NODE_ENV === "production") {
+    console.error("Refusing to seed a production database.");
+    process.exit(1);
+  }
+
+  const realUsers = await db.select({ id: users.id, email: users.email }).from(users);
+  const others = realUsers.filter((u) => u.email.toLowerCase() !== DEMO_EMAIL);
+  if (others.length > 0 && process.argv[2] !== "--force") {
+    console.error(`
+This database already has ${others.length} real account${others.length === 1 ? "" : "s"} in it
+(${others.slice(0, 3).map((u) => u.email).join(", ")}${others.length > 3 ? ", …" : ""}).
+
+Seeding would add a demo workspace alongside your real data. If that is genuinely
+what you want, run it again with --force.
+`);
+    process.exit(1);
+  }
+
   console.log("Seeding demo workspace…");
 
   const existing = await db.select().from(users).where(eq(users.email, DEMO_EMAIL)).limit(1);

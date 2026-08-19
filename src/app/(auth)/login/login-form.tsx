@@ -24,9 +24,6 @@ export function LoginForm() {
       </Field>
       <Button type="submit" className="w-full" loading={pending} size="lg">Sign in</Button>
 
-      <p className="rounded-lg bg-stone-100 px-3 py-2.5 text-[12.5px] text-ink-muted">
-        Demo workspace: <span className="font-medium text-ink">demo@karya.app</span> / <span className="font-medium text-ink">demo1234</span>
-      </p>
     </form>
   );
 }

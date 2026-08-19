@@ -22,13 +22,16 @@ cp .env.example .env
 #                   (macOS/Linux: openssl rand -base64 36)
 
 npm run db:push     # create the tables
-npm run db:seed     # load the demo crochet workspace
 npm run dev         # http://localhost:3000
 ```
 
-Sign in with **demo@karya.app** / **demo1234**, or register a fresh account and pick a template.
+Open http://localhost:3000, **create an account**, and pick a template in onboarding.
 
-The seed creates a workspace with 11 orders across 6 customers, 10 products, per-customer pricing (the same plushie at ₹500, ₹550 and ₹650 for three different customers), two events with a live production plan, and a month of expenses.
+If you want something to look at rather than an empty workspace, `npm run db:seed`
+loads a demo crochet business — 11 orders across 6 customers, 10 products,
+per-customer pricing (the same plushie at ₹500, ₹550 and ₹650 for three different
+customers), two events with a live production plan, and a month of expenses. It
+refuses to run against a database that already contains real accounts.
 
 | Command | What it does |
 |---|---|
@@ -40,7 +43,7 @@ The seed creates a workspace with 11 orders across 6 customers, 10 products, per
 | `npm run db:generate` | Emit a reviewable SQL migration into `drizzle/` |
 | `npm run db:migrate` | Apply migrations (production) |
 | `npm run db:studio` | Browse the data |
-| `npm run db:seed` | Reset and reload the demo workspace |
+| `npm run db:seed` | Load the optional demo workspace (refuses if real accounts exist) |
 | `npm run db:reconcile` | Recompute every order's paid total from its payment rows and correct any drift (run nightly; exits non-zero if it had to fix anything) |
 | `npm run reset-password -- someone@example.com` | Print a single-use password-reset link. The last resort for an owner who is locked out |
 

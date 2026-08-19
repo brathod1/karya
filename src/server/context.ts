@@ -16,6 +16,12 @@ export type OrgContext = {
   role: Role;
   config: OrgConfig;
   actor: { userId: string; name: string };
+  /**
+   * Every workspace this user belongs to. Carried here because the session
+   * lookup already joined them — the workspace switcher asking again was a
+   * second round trip for rows we were holding.
+   */
+  workspaces: { id: string; name: string; current: boolean }[];
 };
 
 export const getCurrentUser = cache(async (): Promise<User | null> => {
@@ -86,6 +92,7 @@ export const requireOrgContext = cache(async (): Promise<OrgContext> => {
     role: chosen.membership.role as Role,
     config,
     actor: { userId: user.id, name: user.name },
+    workspaces: list.map((m) => ({ id: m.org.id, name: m.org.name, current: m.org.id === chosen.org.id })),
   };
 });
 

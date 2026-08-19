@@ -107,25 +107,18 @@ If it hangs or times out, the connection string is wrong or the database isn't r
 
 ## Step 5 — Load the demo data
 
+Open http://localhost:3000 and click **Create an account**. Onboarding will ask
+for a business name and a template, and you'll land in your own empty workspace.
+
+If you'd rather explore a populated app first, there's an optional demo dataset:
+
 ```powershell
 npm run db:seed
 ```
 
-You should see:
-
-```
-Seeding demo workspace…
-
-Done.
-
-  Workspace : Threads by Riya
-  Sign in   : demo@karya.app / demo1234
-  Orders    : 11
-  Customers : 6
-  Products  : 10
-```
-
-This creates a full crochet business: 11 orders in various stages, per-customer pricing, two events with a live production plan, and a month of expenses. Run it again any time to reset back to this state.
+It creates a crochet business with 11 orders in various stages, per-customer
+pricing, two events with a live production plan, and a month of expenses — and
+it refuses to run against a database that already holds real accounts.
 
 ---
 
@@ -135,10 +128,7 @@ This creates a full crochet business: 11 orders in various stages, per-customer 
 npm run dev
 ```
 
-Open <http://localhost:3000> and sign in with:
-
-- **Email:** `demo@karya.app`
-- **Password:** `demo1234`
+Open <http://localhost:3000> and create your account.
 
 Stop the server with `Ctrl + C`.
 

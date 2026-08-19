@@ -50,9 +50,11 @@ export async function profile<T>(label: string, run: () => Promise<T>): Promise<
       const slowest = store.slowest
         ? `\n    slowest ${Math.round(store.slowest.ms)}ms  ${store.slowest.sql}`
         : "";
+      // `db` is the sum across queries; when they run in parallel it exceeds
+      // wall time, so `total` is the number that matters to the user.
       console.log(
         `[perf] ${label.padEnd(12)} ${String(store.count).padStart(3)} queries  ` +
-        `${String(Math.round(store.dbMs)).padStart(5)}ms db  ${String(total).padStart(5)}ms total${slowest}`,
+        `${String(Math.round(store.dbMs)).padStart(5)}ms db(sum)  ${String(total).padStart(5)}ms wall${slowest}`,
       );
     }
   });
