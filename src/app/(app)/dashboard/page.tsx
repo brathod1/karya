@@ -5,8 +5,8 @@ import {
 } from "lucide-react";
 import { requireOrgContext } from "@/server/context";
 import {
-  activityBounds, endOfDay, estimatedProfit, expensesByCategory,
-  monthlySeries, needsAttention, salesSummaryPair, startOfDay, topProducts, totalOutstanding,
+  activityBounds, endOfDay, estimatedProfit, expenseTotals, expensesByCategory,
+  monthlySeries, orderSnapshot, startOfDay, topProducts,
   upcomingEventProgress,
 } from "@/server/domain/analytics";
 import { resolvePeriod, selectableFinancialYears, selectableYears } from "@/lib/period";
@@ -40,11 +40,13 @@ async function DashboardPageInner({
   const period = resolvePeriod(params, now);
   const month = { from: period.from, to: period.to };
 
-  const [[todaySummary, monthSummary], attention, outstanding, series, products, expenses, event, owing, activity, profit, bounds] =
+  // One scan of orders for today, the period, the attention counts and the
+  // outstanding balance; one scan of expenses for both periods. These used to
+  // be six separate statements over two tables.
+  const [snapshot, expenseSums, series, products, expenses, event, owing, activity, profit, bounds] =
     await Promise.all([
-      salesSummaryPair(ctx.org.id, config, today, month),
-      needsAttention(ctx.org.id, config, now),
-      totalOutstanding(ctx.org.id, config),
+      orderSnapshot(ctx.org.id, config, today, month, now),
+      expenseTotals(ctx.org.id, today, month),
       enabled("revenueChart") ? monthlySeries(ctx.org.id, config, 6, now) : Promise.resolve([]),
       enabled("topProducts") ? topProducts(ctx.org.id, config, month, 5) : Promise.resolve([]),
       enabled("expenses") ? expensesByCategory(ctx.org.id, month) : Promise.resolve([]),
@@ -54,6 +56,14 @@ async function DashboardPageInner({
       enabled("profit") ? estimatedProfit(ctx.org.id, config, month) : Promise.resolve(null),
       activityBounds(ctx.org.id),
     ]);
+
+  const todaySummary = { ...snapshot.today, expensesMinor: expenseSums.todayMinor };
+  const monthSummary = { ...snapshot.period, expensesMinor: expenseSums.periodMinor };
+  const attention = snapshot.attention;
+  const outstanding = {
+    outstandingMinor: snapshot.outstandingMinor,
+    unpaidOrders: snapshot.unpaidOrders,
+  };
 
   return (
     <>

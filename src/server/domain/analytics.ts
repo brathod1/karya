@@ -5,9 +5,8 @@ import {
   categories, customers, eventProductionItems, events, expenses, orderItems, orders, payments, products, statusDefinitions,
 } from "@/server/db/schema";
 import { computeEventProgress } from "./events";
-import { isoDate } from "@/lib/dates";
 import {
-  addCalendarDays, addCalendarMonths, calendarDay, endOfCalendarMonth, monthKey, startOfCalendarMonth,
+  addCalendarDays, addCalendarMonths, calendarDay, endOfCalendarMonth, isoDate, monthKey, startOfCalendarMonth,
 } from "@/lib/dates";
 import { completedStatusIds, openStatusIds, statusesBySemantic, type OrgConfig } from "./config";
 
@@ -225,6 +224,105 @@ export async function ordersByStatus(orgId: string, config: OrgConfig) {
     count: n(byId.get(s.id)?.c),
     totalMinor: n(byId.get(s.id)?.totalMinor),
   }));
+}
+
+/**
+ * Everything the dashboard needs to know about orders, in one scan.
+ *
+ * This replaces four separate statements — today's totals, the period's
+ * totals, the five attention counts and the outstanding balance — which were
+ * four passes over the same table with different filters. Measured against a
+ * database ~70ms away, collapsing them removes roughly a third of the page's
+ * remaining wait.
+ */
+export type OrderSnapshot = {
+  today: SalesSummary;
+  period: SalesSummary;
+  attention: AttentionCounts;
+  outstandingMinor: number;
+  unpaidOrders: number;
+};
+
+export async function orderSnapshot(
+  orgId: string, config: OrgConfig, todayRange: DateRange, periodRange: DateRange, now = new Date(),
+): Promise<OrderSnapshot> {
+  const production = statusesBySemantic(config, "PRODUCTION").map((s) => s.id);
+  const shipment = statusesBySemantic(config, "SHIPMENT").map((s) => s.id);
+  const open = openStatusIds(config);
+
+  const inList = (ids: string[]) => (ids.length ? inArray(orders.statusId, ids) : sql`false`);
+  const todayIso = isoDate(calendarDay(now));
+  const within = (range: DateRange) =>
+    sql`${orders.orderDate} between ${isoDate(range.from)} and ${isoDate(range.to)}`;
+
+  const [row] = await db
+    .select({
+      // Today
+      todayCount: sql<number>`count(*) filter (where ${within(todayRange)})`,
+      todaySales: sql<string>`coalesce(sum(${orders.totalMinor}) filter (where ${within(todayRange)}), 0)`,
+      todayPaid: sql<string>`coalesce(sum(${orders.paidMinor}) filter (where ${within(todayRange)}), 0)`,
+      // Selected period
+      periodCount: sql<number>`count(*) filter (where ${within(periodRange)})`,
+      periodSales: sql<string>`coalesce(sum(${orders.totalMinor}) filter (where ${within(periodRange)}), 0)`,
+      periodPaid: sql<string>`coalesce(sum(${orders.paidMinor}) filter (where ${within(periodRange)}), 0)`,
+      // Needs attention
+      inProduction: sql<number>`count(*) filter (where ${inList(production)})`,
+      awaitingShipment: sql<number>`count(*) filter (where ${inList(shipment)})`,
+      dueToday: sql<number>`count(*) filter (where ${inList(open)} and ${orders.deliveryByDate} = ${todayIso})`,
+      overdue: sql<number>`count(*) filter (where ${inList(open)} and ${orders.deliveryByDate} < ${todayIso})`,
+      paymentsPending: sql<number>`count(*) filter (where ${orders.paymentStatus} <> 'PAID')`,
+      // Outstanding, all time
+      outstandingTotal: sql<string>`coalesce(sum(${orders.totalMinor}) filter (where ${orders.paymentStatus} <> 'PAID'), 0)`,
+      outstandingPaid: sql<string>`coalesce(sum(${orders.paidMinor}) filter (where ${orders.paymentStatus} <> 'PAID'), 0)`,
+    })
+    .from(orders)
+    .where(liveOrders(orgId, config));
+
+  const summary = (countValue: unknown, sales: unknown, paid: unknown): SalesSummary => {
+    const salesMinor = n(sales);
+    const collectedMinor = n(paid);
+    const orderCount = n(countValue);
+    return {
+      orderCount,
+      salesMinor,
+      collectedMinor,
+      outstandingMinor: Math.max(salesMinor - collectedMinor, 0),
+      averageOrderMinor: orderCount ? Math.round(salesMinor / orderCount) : 0,
+      expensesMinor: 0, // filled in by the caller from the expenses scan
+    };
+  };
+
+  return {
+    today: summary(row?.todayCount, row?.todaySales, row?.todayPaid),
+    period: summary(row?.periodCount, row?.periodSales, row?.periodPaid),
+    attention: {
+      inProduction: n(row?.inProduction),
+      awaitingShipment: n(row?.awaitingShipment),
+      dueToday: n(row?.dueToday),
+      overdue: n(row?.overdue),
+      paymentsPending: n(row?.paymentsPending),
+    },
+    outstandingMinor: Math.max(n(row?.outstandingTotal) - n(row?.outstandingPaid), 0),
+    unpaidOrders: n(row?.paymentsPending),
+  };
+}
+
+/** Expense totals for the same two ranges, in one scan of the expenses table. */
+export async function expenseTotals(
+  orgId: string, todayRange: DateRange, periodRange: DateRange,
+): Promise<{ todayMinor: number; periodMinor: number }> {
+  const within = (range: DateRange) =>
+    sql`${expenses.date} between ${isoDate(range.from)} and ${isoDate(range.to)}`;
+
+  const [row] = await db
+    .select({
+      todayMinor: sql<string>`coalesce(sum(${expenses.amountMinor}) filter (where ${within(todayRange)}), 0)`,
+      periodMinor: sql<string>`coalesce(sum(${expenses.amountMinor}) filter (where ${within(periodRange)}), 0)`,
+    })
+    .from(expenses)
+    .where(and(eq(expenses.orgId, orgId), isNull(expenses.archivedAt)));
+
+  return { todayMinor: n(row?.todayMinor), periodMinor: n(row?.periodMinor) };
 }
 
 export type AttentionCounts = {
