@@ -1,8 +1,8 @@
 import "server-only";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, like, sql } from "drizzle-orm";
 import type { Exec } from "@/server/db";
-import { numberSequences } from "@/server/db/schema";
-import { renderNumber } from "@/lib/numbering-format";
+import { numberSequences, orders } from "@/server/db/schema";
+import { extractSeq, lowestAvailable, renderNumber, splitPattern, type PatternParts } from "@/lib/numbering-format";
 
 export { renderNumber };
 
@@ -31,37 +31,89 @@ function needsReset(policy: string, lastResetAt: Date | null, on: Date): boolean
   return false;
 }
 
+/** Escapes LIKE wildcards so a user-configured prefix is matched literally. */
+function escapeLike(s: string): string {
+  return s.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
+/**
+ * Every sequence value currently carried by this org's orders in the pattern's
+ * period — live AND archived alike. An archived order still exists and can be
+ * restored, so its number stays taken (the unique index on (org_id, number)
+ * would reject a reuse anyway). Only permanent deletion, which removes the row,
+ * returns a number to the pool.
+ */
+async function usedOrderSeqs(tx: Exec, orgId: string, parts: PatternParts): Promise<Set<number>> {
+  const rows = await tx
+    .select({ number: orders.number })
+    .from(orders)
+    .where(and(eq(orders.orgId, orgId), like(orders.number, `${escapeLike(parts.before)}%`)));
+  const used = new Set<number>();
+  for (const row of rows) {
+    const seq = extractSeq(row.number, parts);
+    if (seq !== null) used.add(seq);
+  }
+  return used;
+}
+
 /**
  * Allocates the next number. MUST be called inside the same transaction as the
- * row it numbers: the UPDATE ... RETURNING takes a row lock, so concurrent
- * creates queue rather than collide.
+ * row it numbers. The SELECT ... FOR UPDATE on the sequence row serialises
+ * concurrent allocations for the same org + entity: the second transaction
+ * blocks until the first commits, then sees its rows. The unique index on
+ * (org_id, number) remains the backstop.
+ *
+ * Orders fill gaps: a new order takes the LOWEST sequence not carried by any
+ * existing order of the org in the pattern's period (per year under the default
+ * yearly pattern). Numbers freed by permanent deletion are re-issued; archived
+ * orders keep theirs; existing orders are never renumbered. Other entities keep
+ * the plain incrementing counter.
  */
 export async function allocateNumber(tx: Exec, orgId: string, entity: SequenceEntity, on = new Date()): Promise<string> {
-  const [existing] = await tx
+  const defaults = DEFAULT_SEQUENCES[entity];
+
+  let [row] = await tx
     .select()
     .from(numberSequences)
     .where(and(eq(numberSequences.orgId, orgId), eq(numberSequences.entityType, entity)))
-    .limit(1);
+    .limit(1)
+    .for("update");
 
-  const defaults = DEFAULT_SEQUENCES[entity];
-
-  if (!existing) {
-    const [created] = await tx
+  if (!row) {
+    // First allocation for this org + entity. onConflictDoNothing plus
+    // re-select (with the lock) keeps two concurrent first allocations from
+    // both inserting or both proceeding.
+    await tx
       .insert(numberSequences)
-      .values({ orgId, entityType: entity, prefix: defaults.prefix, pattern: defaults.pattern, resetPolicy: defaults.resetPolicy, nextValue: 2, lastResetAt: on })
-      .returning();
-    return renderNumber(created.pattern, created.prefix, 1, on);
+      .values({ orgId, entityType: entity, prefix: defaults.prefix, pattern: defaults.pattern, resetPolicy: defaults.resetPolicy, nextValue: 1, lastResetAt: on })
+      .onConflictDoNothing();
+    [row] = await tx
+      .select()
+      .from(numberSequences)
+      .where(and(eq(numberSequences.orgId, orgId), eq(numberSequences.entityType, entity)))
+      .limit(1)
+      .for("update");
   }
+  if (!row) throw new Error("Could not create the number sequence for this workspace.");
 
-  const reset = needsReset(existing.resetPolicy, existing.lastResetAt, on);
-  const value = reset ? 1 : existing.nextValue;
+  const reset = needsReset(row.resetPolicy, row.lastResetAt, on);
+  let value = reset ? 1 : row.nextValue;
+  let next = value + 1;
+
+  const parts = entity === "ORDER" ? splitPattern(row.pattern, row.prefix, on) : null;
+  if (parts) {
+    const used = await usedOrderSeqs(tx, orgId, parts);
+    value = lowestAvailable(used);
+    used.add(value);
+    next = lowestAvailable(used); // keeps the settings page's "Next:" preview truthful
+  }
 
   await tx
     .update(numberSequences)
-    .set({ nextValue: value + 1, lastResetAt: reset ? on : existing.lastResetAt ?? on })
-    .where(eq(numberSequences.id, existing.id));
+    .set({ nextValue: next, lastResetAt: reset ? on : row.lastResetAt ?? on })
+    .where(eq(numberSequences.id, row.id));
 
-  return renderNumber(existing.pattern, existing.prefix, value, on);
+  return renderNumber(row.pattern, row.prefix, value, on);
 }
 
 export async function ensureSequences(tx: Exec, orgId: string) {

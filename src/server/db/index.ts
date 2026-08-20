@@ -66,7 +66,9 @@ function instrument(target: Pool): Pool {
       if (prop === "connect") {
         return async (...args: unknown[]) => {
           const connect = pool.connect as unknown as (...a: unknown[]) => Promise<PoolClient>;
-          const client = await connect(...args);
+          // `.apply(pool, …)`: an extracted method loses its `this`; pg's
+          // Pool.connect reads `this.ending` first thing and crashes without it.
+          const client = await connect.apply(pool, args);
           const original = client.query as unknown as (...a: never[]) => unknown;
           (client as unknown as { query: unknown }).query = timed(original, client);
           return client;
