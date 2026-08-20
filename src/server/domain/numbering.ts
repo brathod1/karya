@@ -2,7 +2,7 @@ import "server-only";
 import { and, eq, like, sql } from "drizzle-orm";
 import type { Exec } from "@/server/db";
 import { numberSequences, orders } from "@/server/db/schema";
-import { extractSeq, lowestAvailable, renderNumber, splitPattern, type PatternParts } from "@/lib/numbering-format";
+import { extractSeq, nextSequenceValue, renderNumber, splitPattern, type PatternParts } from "@/lib/numbering-format";
 
 export { renderNumber };
 
@@ -38,10 +38,10 @@ function escapeLike(s: string): string {
 
 /**
  * Every sequence value currently carried by this org's orders in the pattern's
- * period — live AND archived alike. An archived order still exists and can be
- * restored, so its number stays taken (the unique index on (org_id, number)
- * would reject a reuse anyway). Only permanent deletion, which removes the row,
- * returns a number to the pool.
+ * period — live AND archived alike. Used as a floor for the counter, never as
+ * a pool: numbers are permanently consumed once issued, so deletion frees
+ * nothing. This scan exists to self-heal a counter that has fallen behind the
+ * orders that actually exist.
  */
 async function usedOrderSeqs(tx: Exec, orgId: string, parts: PatternParts): Promise<Set<number>> {
   const rows = await tx
@@ -63,11 +63,12 @@ async function usedOrderSeqs(tx: Exec, orgId: string, parts: PatternParts): Prom
  * blocks until the first commits, then sees its rows. The unique index on
  * (org_id, number) remains the backstop.
  *
- * Orders fill gaps: a new order takes the LOWEST sequence not carried by any
- * existing order of the org in the pattern's period (per year under the default
- * yearly pattern). Numbers freed by permanent deletion are re-issued; archived
- * orders keep theirs; existing orders are never renumbered. Other entities keep
- * the plain incrementing counter.
+ * Order numbers are strictly increasing and NEVER reused: deleting or archiving
+ * an order permanently consumes its number. The stored counter is the authority
+ * ("highest ever issued + 1"); a max-scan of existing order numbers acts as a
+ * floor so the counter self-heals if it ever lags behind reality (as after the
+ * short-lived gap-reuse deployment). Sequences are per organisation and, under
+ * the default yearly pattern, per year. Existing orders are never renumbered.
  */
 export async function allocateNumber(tx: Exec, orgId: string, entity: SequenceEntity, on = new Date()): Promise<string> {
   const defaults = DEFAULT_SEQUENCES[entity];
@@ -103,9 +104,8 @@ export async function allocateNumber(tx: Exec, orgId: string, entity: SequenceEn
   const parts = entity === "ORDER" ? splitPattern(row.pattern, row.prefix, on) : null;
   if (parts) {
     const used = await usedOrderSeqs(tx, orgId, parts);
-    value = lowestAvailable(used);
-    used.add(value);
-    next = lowestAvailable(used); // keeps the settings page's "Next:" preview truthful
+    value = nextSequenceValue(value, used);
+    next = value + 1;
   }
 
   await tx

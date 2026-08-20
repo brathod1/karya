@@ -6,7 +6,7 @@ import {
   paymentMethods, payments, products, statusDefinitions,
   type Order, type StatusDefinition,
 } from "@/server/db/schema";
-import { computeOrderTotals, resolveUnitPrice, type PriceSource } from "./pricing";
+import { computeLine, computeOrderTotals, resolveUnitPrice, type PriceSource } from "./pricing";
 import { creditBalance, derivePaymentStatus, paidTotal, validatePayment } from "./payments";
 import { allocateNumber } from "./numbering";
 import { logActivity, logAudit, type Actor } from "./audit";
@@ -61,6 +61,8 @@ type PricedItem = {
   quantity: number;
   unitPriceMinor: number;
   discountMinor: number;
+  /** Snapshot of quantity × unit − line discount. What analytics sums. */
+  lineTotalMinor: number;
   priceSource: PriceSource;
   note: string | null;
   attributes: LineAttributes | null;
@@ -108,12 +110,19 @@ export async function priceItems(
     const parsedAttributes = parseLineAttributes(attributeDefs, item.attributes);
     if (!parsedAttributes.ok) throw new Error(`"${name}": ${parsedAttributes.error}`);
 
+    const discountMinor = Math.max(item.discountMinor ?? 0, 0);
     return {
       productId: item.productId,
       productNameSnapshot: name,
       quantity: item.quantity,
       unitPriceMinor: resolved.unitPriceMinor,
-      discountMinor: Math.max(item.discountMinor ?? 0, 0),
+      discountMinor,
+      // The snapshot analytics sums. Was silently left at the column default of
+      // 0 by this path — the totals on the order were right, but every line
+      // (and Top products) showed ₹0.
+      lineTotalMinor: computeLine({
+        quantity: item.quantity, unitPriceMinor: resolved.unitPriceMinor, discountMinor,
+      }).lineTotalMinor,
       priceSource: item.productId ? resolved.source : "MANUAL",
       note: item.note ?? null,
       attributes: parsedAttributes.attributes,

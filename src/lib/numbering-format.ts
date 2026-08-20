@@ -50,11 +50,15 @@ export function extractSeq(number: string, parts: PatternParts): number | null {
 }
 
 /**
- * The smallest positive integer absent from `used`: numbers freed by deletion
- * are re-issued before the sequence grows.
+ * The next sequence value to issue: whichever is higher of the stored counter
+ * and (highest number visibly in use + 1). Numbers are NEVER reused — deleting
+ * or archiving an order permanently consumes its number. The max-scan is a
+ * self-healing guard: if the counter ever lags behind what actually exists
+ * (e.g. after the counter was tampered with or lowered), allocation still
+ * lands above every existing number.
  */
-export function lowestAvailable(used: ReadonlySet<number>): number {
-  let value = 1;
-  while (used.has(value)) value += 1;
-  return value;
+export function nextSequenceValue(counter: number, used: ReadonlySet<number>): number {
+  let highest = 0;
+  for (const v of used) if (v > highest) highest = v;
+  return Math.max(counter, highest + 1);
 }

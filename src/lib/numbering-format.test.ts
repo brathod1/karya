@@ -1,47 +1,49 @@
 import { describe, expect, it } from "vitest";
-import { extractSeq, lowestAvailable, renderNumber, splitPattern } from "@/lib/numbering-format";
+import { extractSeq, nextSequenceValue, renderNumber, splitPattern } from "@/lib/numbering-format";
 
 const on2026 = new Date(2026, 2, 10);
 const on2027 = new Date(2027, 2, 10);
 
 const used = (...values: number[]) => new Set(values);
 
-describe("lowestAvailable — new order takes the lowest free sequence", () => {
-  it("no gaps: 1,2,3 → 4", () => {
-    expect(lowestAvailable(used(1, 2, 3))).toBe(4);
+describe("nextSequenceValue — numbers are never reused", () => {
+  // counter = the stored "next value to issue" (highest ever issued + 1)
+
+  it("orders 1..10 exist, #5 deleted → next is 11, not 5", () => {
+    expect(nextSequenceValue(11, used(1, 2, 3, 4, 6, 7, 8, 9, 10))).toBe(11);
   });
 
-  it("middle gap: 1,2,4,5 → 3", () => {
-    expect(lowestAvailable(used(1, 2, 4, 5))).toBe(3);
+  it("latest deleted: 1..10 exist, #10 deleted → next is 11, not 10", () => {
+    expect(nextSequenceValue(11, used(1, 2, 3, 4, 5, 6, 7, 8, 9))).toBe(11);
   });
 
-  it("multiple gaps: 1,3,7 → 2 (lowest wins)", () => {
-    expect(lowestAvailable(used(1, 3, 7))).toBe(2);
+  it("multiple deleted: #2, #5, #8 gone → next is still 11, then 12, 13…", () => {
+    const remaining = used(1, 3, 4, 6, 7, 9, 10);
+    expect(nextSequenceValue(11, remaining)).toBe(11);
+    expect(nextSequenceValue(12, new Set([...remaining, 11]))).toBe(12);
+    expect(nextSequenceValue(13, new Set([...remaining, 11, 12]))).toBe(13);
   });
 
-  it("lowest deleted: 1,2,3 minus 1 → 1", () => {
-    expect(lowestAvailable(used(2, 3))).toBe(1);
+  it("client's exact case: orders up to 47, #37 deleted → next is 48", () => {
+    const existing = new Set(Array.from({ length: 47 }, (_, i) => i + 1));
+    existing.delete(37);
+    expect(nextSequenceValue(48, existing)).toBe(48);
   });
 
-  it("latest deleted: 1,2,3 minus 3 → 3", () => {
-    expect(lowestAvailable(used(1, 2))).toBe(3);
+  it("gaps are never searched: 1, 3, 7 with counter 8 → 8", () => {
+    expect(nextSequenceValue(8, used(1, 3, 7))).toBe(8);
   });
 
-  it("multiple deleted: 1,2,3,4 minus 2 and 4 → 2", () => {
-    expect(lowestAvailable(used(1, 3))).toBe(2);
+  it("self-heals a counter that fell behind existing orders", () => {
+    // The short-lived gap-reuse deployment could leave the counter below the
+    // highest existing order; the max-scan floor pulls allocation above it.
+    expect(nextSequenceValue(38, used(1, 2, 45, 46, 47))).toBe(48);
+    // Counter also heals past numbers consumed by deleted orders it remembers:
+    expect(nextSequenceValue(48, used(1, 2, 3))).toBe(48);
   });
 
-  it("empty set → 1", () => {
-    expect(lowestAvailable(used())).toBe(1);
-  });
-
-  it("client's exact example: 10..15 minus 14 → 14, minus 14+15 → 14, minus 13+14+15 → 13", () => {
-    // Sequences 1..9 were themselves deleted in this scenario, so 1 is genuinely
-    // free — but with 1..9 still present the gap logic must land inside 10..15.
-    const base = [1, 2, 3, 4, 5, 6, 7, 8, 9];
-    expect(lowestAvailable(new Set([...base, 10, 11, 12, 13, 15]))).toBe(14);
-    expect(lowestAvailable(new Set([...base, 10, 11, 12, 13]))).toBe(14);
-    expect(lowestAvailable(new Set([...base, 10, 11, 12]))).toBe(13);
+  it("fresh sequence with no orders → 1", () => {
+    expect(nextSequenceValue(1, used())).toBe(1);
   });
 });
 
@@ -50,12 +52,12 @@ describe("splitPattern — period scoping comes from the rendered pattern", () =
     expect(splitPattern("{PREFIX}-{YYYY}-{SEQ:4}", "ORD", on2026)).toEqual({ before: "ORD-2026-", after: "", digits: 4 });
   });
 
-  it("different years produce different scopes (2026 vs 2027 sequences are independent)", () => {
+  it("different years produce independent scopes (2027 restarts at 0001)", () => {
     const a = splitPattern("{PREFIX}-{YYYY}-{SEQ:4}", "ORD", on2026)!;
     const b = splitPattern("{PREFIX}-{YYYY}-{SEQ:4}", "ORD", on2027)!;
     expect(a.before).not.toBe(b.before);
-    expect(extractSeq("ORD-2027-0001", a)).toBeNull(); // a 2027 number never occupies a 2026 slot
-    expect(extractSeq("ORD-2026-0001", b)).toBeNull();
+    expect(extractSeq("ORD-2027-0001", a)).toBeNull(); // 2027 numbers invisible to the 2026 scan
+    expect(extractSeq("ORD-2026-0099", b)).toBeNull(); // and vice versa
   });
 
   it("handles month tokens and text after the sequence", () => {
@@ -68,7 +70,7 @@ describe("splitPattern — period scoping comes from the rendered pattern", () =
   });
 });
 
-describe("extractSeq — only numbers of this pattern and period count as taken", () => {
+describe("extractSeq — only numbers of this pattern and period count", () => {
   const parts = splitPattern("{PREFIX}-{YYYY}-{SEQ:4}", "ORD", on2026)!;
 
   it("reads the sequence out of a well-formed number", () => {
@@ -92,22 +94,21 @@ describe("extractSeq — only numbers of this pattern and period count as taken"
   });
 });
 
-describe("allocation round-trip — extract, fill the gap, render", () => {
-  it("renders the filled gap in the unchanged visible format", () => {
+describe("allocation round-trip — scan, advance, render", () => {
+  it("renders strictly increasing numbers in the unchanged visible format", () => {
     const parts = splitPattern("{PREFIX}-{YYYY}-{SEQ:4}", "ORD", on2026)!;
-    const existing = ["ORD-2026-0010", "ORD-2026-0011", "ORD-2026-0012", "ORD-2026-0013", "ORD-2026-0015"];
+    const existing = ["ORD-2026-0045", "ORD-2026-0046", "ORD-2026-0047"];
     const taken = new Set(existing.map((n) => extractSeq(n, parts)!));
-    for (let i = 1; i <= 9; i++) taken.add(i); // 1..9 also in use
-    const value = lowestAvailable(taken);
-    expect(value).toBe(14);
-    expect(renderNumber("{PREFIX}-{YYYY}-{SEQ:4}", "ORD", value, on2026)).toBe("ORD-2026-0014");
+    const value = nextSequenceValue(48, taken);
+    expect(value).toBe(48);
+    expect(renderNumber("{PREFIX}-{YYYY}-{SEQ:4}", "ORD", value, on2026)).toBe("ORD-2026-0048");
   });
 
-  it("two businesses never share a pool (each org's used-set is queried per org)", () => {
+  it("two businesses have fully independent sequences", () => {
     const parts = splitPattern("{PREFIX}-{YYYY}-{SEQ:4}", "ORD", on2026)!;
-    const orgA = new Set([extractSeq("ORD-2026-0001", parts)!]);
+    const orgA = new Set([extractSeq("ORD-2026-0047", parts)!]);
     const orgB = new Set<number>();
-    expect(lowestAvailable(orgA)).toBe(2);
-    expect(lowestAvailable(orgB)).toBe(1); // B happily issues ORD-2026-0001 too
+    expect(nextSequenceValue(48, orgA)).toBe(48);
+    expect(nextSequenceValue(1, orgB)).toBe(1); // B starts at ORD-2026-0001 regardless of A
   });
 });
