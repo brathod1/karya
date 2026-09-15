@@ -39,6 +39,7 @@ refuses to run against a database that already contains real accounts.
 | `npm run build` / `npm start` | Production build and run |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm test` | Domain unit tests (pricing, balances, credit, production, money, dates, uploads, throttling) |
+| `npm run test:integration` | Tenant-isolation tests against a real database: two workspaces, each trying to reach the other's data through every action, read model and the file route. Needs a **development** `DATABASE_URL`; refuses the production endpoint and deletes what it creates |
 | `npm run db:push` | Sync the schema straight to the database (development) |
 | `npm run db:generate` | Emit a reviewable SQL migration into `drizzle/` |
 | `npm run db:migrate` | Apply migrations (production) |

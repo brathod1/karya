@@ -2,10 +2,11 @@ import "server-only";
 import { and, eq, inArray, or, sql } from "drizzle-orm";
 import { db, type Exec } from "@/server/db";
 import {
-  activityEntries, attachments, auditLogs, customFieldValues, customerPrices, customers, orderItems, orders,
-  paymentMethods, payments, products, statusDefinitions,
+  activityEntries, attachments, auditLogs, customFieldValues, customerPrices, orderItems, orders,
+  payments, products, statusDefinitions,
   type Order, type StatusDefinition,
 } from "@/server/db/schema";
+import { assertCustomerInOrg, assertMethodInOrg } from "./ownership";
 import { computeLine, computeOrderTotals, resolveUnitPrice, type PriceSource } from "./pricing";
 import { creditBalance, derivePaymentStatus, paidTotal, validatePayment } from "./payments";
 import { allocateNumber } from "./numbering";
@@ -141,25 +142,6 @@ function totalsFor(config: OrgConfig, priced: PricedItem[], input: OrderInput) {
     taxRatePercent: config.settings.pricing.taxRatePercent,
     taxInclusive: config.settings.pricing.taxInclusive,
   });
-}
-
-/**
- * Foreign keys arriving from a client are UUIDs — shape-valid but not proof of
- * ownership. Reads are org-scoped, so a foreign id cannot leak data, but it
- * could still corrupt a row. Every externally supplied id is checked here.
- */
-async function assertCustomerInOrg(tx: Exec, orgId: string, customerId: string | null | undefined) {
-  if (!customerId) return;
-  const [row] = await tx.select({ id: customers.id }).from(customers)
-    .where(and(eq(customers.orgId, orgId), eq(customers.id, customerId))).limit(1);
-  mustExist(row, "Customer");
-}
-
-async function assertMethodInOrg(tx: Exec, orgId: string, methodId: string | null | undefined) {
-  if (!methodId) return;
-  const [row] = await tx.select({ id: paymentMethods.id }).from(paymentMethods)
-    .where(and(eq(paymentMethods.orgId, orgId), eq(paymentMethods.id, methodId))).limit(1);
-  mustExist(row, "Payment method");
 }
 
 function resolveStatus(config: OrgConfig, statusId: string | null | undefined): StatusDefinition {

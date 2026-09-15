@@ -9,6 +9,7 @@ import {
 } from "@/server/db/schema";
 import { requireCapability } from "@/server/context";
 import { logAudit } from "@/server/domain/audit";
+import { assertCategoryInOrg } from "@/server/domain/ownership";
 import { orgSettingsSchema } from "@/lib/settings";
 import { keyify } from "@/lib/format";
 import { fail } from "./result";
@@ -171,6 +172,9 @@ export async function upsertCategoryAction(input: unknown) {
       name: z.string().min(1, "Give the category a name"),
       parentId: z.string().uuid().nullable().optional(),
     }).parse(input);
+
+    // A parent must be one of this workspace's categories, of the same kind.
+    await assertCategoryInOrg(db, ctx.org.id, parsed.parentId, parsed.kind);
 
     if (parsed.id) {
       if (parsed.parentId === parsed.id) throw new Error("A category cannot be its own parent.");

@@ -9,6 +9,7 @@ import { logActivity, logAudit, type Actor } from "./audit";
 import { loadFieldDefs, saveCustomFieldValues } from "./fields";
 import { validateCompletion } from "./events";
 import { mustExist } from "@/server/db/tenant";
+import { assertCategoryInOrg, assertMethodInOrg } from "./ownership";
 import type { OrgConfig } from "./config";
 
 type Base = { orgId: string; config: OrgConfig; actor: Actor };
@@ -113,6 +114,7 @@ export type ProductInput = {
 
 export async function createProduct({ orgId, config, actor }: Base, input: ProductInput) {
   return db.transaction(async (tx) => {
+    await assertCategoryInOrg(tx, orgId, input.categoryId, "PRODUCT");
     const code = await allocateNumber(tx, orgId, "PRODUCT");
     const [row] = await tx.insert(products).values({
       orgId, code, name: input.name.trim(), description: input.description || null,
@@ -135,6 +137,7 @@ export async function updateProduct({ orgId, config, actor }: Base, id: string, 
   return db.transaction(async (tx) => {
     const [before] = await tx.select().from(products).where(and(eq(products.orgId, orgId), eq(products.id, id))).limit(1);
     mustExist(before, config.t("product"));
+    await assertCategoryInOrg(tx, orgId, input.categoryId, "PRODUCT");
 
     const [row] = await tx.update(products).set({
       name: input.name.trim(), description: input.description || null, categoryId: input.categoryId || null,
@@ -173,6 +176,8 @@ export type ExpenseInput = {
 export async function createExpense({ orgId, config, actor }: Base, input: ExpenseInput) {
   if (input.amountMinor < 0) throw new Error("Amount cannot be negative.");
   return db.transaction(async (tx) => {
+    await assertCategoryInOrg(tx, orgId, input.categoryId, "EXPENSE");
+    await assertMethodInOrg(tx, orgId, input.methodId);
     const code = await allocateNumber(tx, orgId, "EXPENSE", input.date);
     const [row] = await tx.insert(expenses).values({
       orgId, code, date: input.date, description: input.description.trim(),
@@ -195,6 +200,8 @@ export async function updateExpense({ orgId, config, actor }: Base, id: string, 
   return db.transaction(async (tx) => {
     const [before] = await tx.select().from(expenses).where(and(eq(expenses.orgId, orgId), eq(expenses.id, id))).limit(1);
     mustExist(before, config.t("expense"));
+    await assertCategoryInOrg(tx, orgId, input.categoryId, "EXPENSE");
+    await assertMethodInOrg(tx, orgId, input.methodId);
 
     const [row] = await tx.update(expenses).set({
       date: input.date, description: input.description.trim(), categoryId: input.categoryId || null,
@@ -276,6 +283,7 @@ export async function addProductionItem({ orgId, config, actor }: Base, eventId:
   return db.transaction(async (tx) => {
     const [event] = await tx.select().from(events).where(and(eq(events.orgId, orgId), eq(events.id, eventId))).limit(1);
     mustExist(event, config.t("event"));
+    await assertCategoryInOrg(tx, orgId, input.categoryId, "PRODUCT");
 
     let name = input.productName?.trim() ?? "";
     let categoryId = input.categoryId ?? null;
@@ -315,6 +323,7 @@ export async function updateProductionItem({ orgId, config, actor }: Base, itemI
     const [before] = await tx.select().from(eventProductionItems)
       .where(and(eq(eventProductionItems.orgId, orgId), eq(eventProductionItems.id, itemId))).limit(1);
     mustExist(before, "Production line");
+    if (input.categoryId !== undefined) await assertCategoryInOrg(tx, orgId, input.categoryId, "PRODUCT");
 
     const planned = input.quantityPlanned ?? before.quantityPlanned;
     const completed = input.quantityCompleted ?? before.quantityCompleted;

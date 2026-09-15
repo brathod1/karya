@@ -46,13 +46,14 @@ Decisions so far (15 Sep 2026):
 
 ## Phase 1: Safe to have a second tenant (code and infra, before client #2)
 
-- [ ] **P1.1 Cross-tenant isolation tests.** Integration tests against a real Postgres (Neon dev branch or local). Create org A and org B, then check that B cannot read or change A's:
-  - orders, payments, customers, products, events, expenses
-  - attachments (`/api/attachments/[id]`)
-  - saved views, audit log, CSV exports, import jobs
-
-  Also check that B cannot be invited or switched into A's workspace. All current tests are unit tests; none cover this.
-- [ ] **P1.2 Check every server action and route for org scoping.** Each must use `requireOrgContext` / `requireCapability` and `scope()` / `scoped()`, and must check that ids sent by the client belong to the org.
+- [x] **P1.1 Cross-tenant isolation tests.** Done 15 Sep 2026: `npm run test:integration` (`src/server/tenant-isolation.integration.test.ts`).
+  - **Setup:** two fully seeded workspaces on the Neon dev branch. B's *owner* (so a refusal can only come from tenancy, not permissions) attacks A by id through every server action, the read models, analytics, import, the attachment route and the session/workspace switch. Positive controls prove the fixture is real.
+  - **Safety:** refuses the production endpoint and deletes everything it creates.
+  - **Result:** 40 tests. The first run **found a real leak**: products, expenses and production lines accepted another workspace's category or payment-method id, and category settings accepted another workspace's parent. The list screens join those tables by id alone, so B would have shown A's labels. Fixed with shared checks in `src/server/domain/ownership.ts`.
+  - **Production data:** a read-only query on the dev snapshot found no existing cross-workspace references.
+- [~] **P1.2 Check every server action and route for org scoping.** All server actions, `queries.ts`, `analytics.ts`, the attachment route and the pages that query directly were read during P1.1; the client-supplied-id gaps above are fixed. Remaining, lower-risk findings:
+  - **Invitations are claimed by email alone** (`claimInvitations` in `domain/members.ts`). With no email verification, anyone who registers with an invited address joins that workspace with the invited role. Inviting an address that already has an account also adds them immediately, without their consent. **Must be fixed before open self-serve signup:** email verification (P3.4) or a single-use invite link.
+  - **Audit entries on no-op archives.** `archiveCustomer` / `archiveProduct` / `archiveExpense` / `archiveEvent` / `removeCustomerPrice` / `removeProductionItem` write an audit entry even when the id isn't in the workspace. No data changes, but the audit log gains misleading rows. Low.
 - [ ] **P1.3 Paid database plan.** Upgrade Neon from free: longer point-in-time restore window, no cold-start sleep.
 - [ ] **P1.4 Restore drill.** Restore production as of a past point into a new branch, verify the data, and write the steps into a runbook.
 - [ ] **P1.5 Vercel Pro.** The Hobby plan is non-commercial. Move before taking money.
