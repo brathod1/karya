@@ -41,6 +41,18 @@ Using a name gives prior-use rights in India even without a registered trademark
 3. Check the `.in` and `.com` domains and Instagram / WhatsApp Business handles.
 4. Before spending on branding, get a short clearance opinion from a trademark attorney.
 
+## Naming brainstorm, 15 Sep 2026 (parked)
+
+Two rounds of suggestions were rejected. The decision was to park naming and keep "Karya" internally until a name comes up. Record of what didn't work, so it isn't repeated:
+
+- **Round 1 (rejected):** Parchi, Bayana, Baaki, Pakka, Chopdo, Taiyaar, Dhaaga, Taana, Haathse, Galla, Stallwise, Makerbook, Handled, Orderwala, Duely, Loopd. Reasons given: too desi / colloquial, too cute / craft-y, too descriptive, and they don't sound good.
+- **Round 2 (rejected):** Kramo, Orvia, Ordiva, Settlo, Kivo, Tavio, Clasp, Keel, Plinth.
+- **What is wanted:** a **modern / startup** feel, "creative but within limits". Not local slang, not tied to crafts, not a literal description.
+
+**Next time:** start from the user's own ideas, or from 2–3 brand names they love, rather than generating lists cold. Screen only the names the user likes.
+
+None of these names were screened for conflicts.
+
 ## Sources
 
 - https://www.karya.cloud/

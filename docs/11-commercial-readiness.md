@@ -35,7 +35,7 @@ Decisions so far (15 Sep 2026):
 
   Use `research/client-conversation-guide.md` and record notes there.
 - [~] **P0.3 Pricing hypothesis.** First draft in `research/2026-09-pricing.md`: Free (capped orders) / Solo ₹149–199/mo / Team ₹399–499/mo, inside the Indian ₹1,500–4,000/yr band. Still to do: test it in the P0.2 conversation and with the first 2–3 local prospects. **Do not build billing yet.**
-- [~] **P0.4 Name / trademark search.** Web research is done and the risk is **high** (karya.cloud sells SME SaaS in India under the same name; a KARYAFLOW class 42 filing was made in Ahmedabad in Aug 2026). Next steps:
+- [~] **P0.4 Name / trademark search.** **Parked (15 Sep 2026):** keep "Karya" internally for now and come back when a name comes to mind. Nothing public (domain, landing page, logo) should use "Karya" in the meantime. Rejected directions are listed in `research/2026-09-name-check.md`. Web research is done and the risk is **high** (karya.cloud sells SME SaaS in India under the same name; a KARYAFLOW class 42 filing was made in Ahmedabad in Aug 2026). Next steps:
   - (a) choose a new name
   - (b) run the IP India wordmark and phonetic search (classes 9 / 42 / 35) on the shortlist
   - (c) check domains and social handles
