@@ -14,22 +14,35 @@ Status: `[ ]` todo · `[~]` in progress · `[x]` done
 - Work from the lowest unfinished phase. Do not build "Deliberately later" items unless priorities change on purpose.
 - The legal items are not legal advice. Have a CA or lawyer review them once.
 
-Open questions:
-- Does the current client pay anything?
-- Sales approach: businesses onboarded by hand, or open self-serve signup?
-- Has the employment contract been checked?
+Decisions so far (15 Sep 2026):
+- **Current client:** a friend who uses Karya for free and is testing everything. There are no plans to charge her.
+- **Employment:** not applicable. This is an unrelated project.
+- **Sales approach:** local businesses first, but **self-serve**. A new business enters an email and starts, with no hand-holding required. That makes email verification, forgot-password, signup consent and first-run onboarding (P2.7, P3.1–P3.5) more urgent than originally ranked.
+- **First target:** home and handmade sellers, then small shops / retail. Research suggests handmade is the stronger place to start (see `research/2026-09-pricing.md`).
+- **Name:** "Karya" is **high risk**. An Indian company already sells SME SaaS as Karya (karya.cloud). See `research/2026-09-name-check.md`.
 
 ---
 
 ## Phase 0: Foundations (no code, do first)
 
-- [ ] **P0.1 Employment contract check.** Read the IP-assignment, moonlighting and conflict-of-interest clauses, and get written permission if needed. This decides who owns Karya. (`MOVING.md` already raised it.)
-- [ ] **P0.2 Validate with the current client.** Ask whether she would pay, how much, and what she'd miss most if Karya disappeared. If the answers are positive, ask for a testimonial.
-- [ ] **P0.3 Pricing hypothesis.** Draft plans: trial length, monthly/yearly price, limits (users, storage). Check them against P0.2.
-- [ ] **P0.4 Name / trademark search.** "Karya" is a common word and at least one Indian tech company already uses it. Search the IP India trademark registry (classes 9 and 42) before buying a domain or doing any branding.
-- [ ] **P0.5 Business structure.** Start as a sole proprietorship (PAN, current account in the business name). Revisit LLP or Pvt Ltd once there is revenue or a partner.
-- [ ] **P0.6 GST decision.** Registration becomes mandatory above ₹20 lakh turnover (services). Consider registering voluntarily if business clients need GST invoices.
-- [ ] **P0.7 Decide the sales approach.** Businesses onboarded by hand, or open self-serve signup. The answer changes how urgent Phase 3 is.
+- [x] **P0.1 Employment contract check.** Not applicable: this is an unrelated project (confirmed 15 Sep 2026).
+- [ ] **P0.2 Conversation with the current client.** She's a friend using it free, so the goal is learning, not charging:
+  - what she uses daily
+  - what's still outside Karya
+  - what price she'd call fair
+  - introductions to similar sellers
+  - permission to quote her
+
+  Use `research/client-conversation-guide.md` and record notes there.
+- [~] **P0.3 Pricing hypothesis.** First draft in `research/2026-09-pricing.md`: Free (capped orders) / Solo ₹149–199/mo / Team ₹399–499/mo, inside the Indian ₹1,500–4,000/yr band. Still to do: test it in the P0.2 conversation and with the first 2–3 local prospects. **Do not build billing yet.**
+- [~] **P0.4 Name / trademark search.** Web research is done and the risk is **high** (karya.cloud sells SME SaaS in India under the same name; a KARYAFLOW class 42 filing was made in Ahmedabad in Aug 2026). Next steps:
+  - (a) choose a new name
+  - (b) run the IP India wordmark and phonetic search (classes 9 / 42 / 35) on the shortlist
+  - (c) check domains and social handles
+  - (d) rename in code before any public launch
+- [~] **P0.5 Business structure.** Not needed while there's no revenue. Trigger: before the first paid invoice, start as a sole proprietorship (PAN, current account in the business name).
+- [~] **P0.6 GST decision.** Not needed yet: registration is only mandatory above ₹20 lakh turnover (services). Revisit if a business client asks for a GST invoice.
+- [x] **P0.7 Decide the sales approach.** Local first, self-serve signup (email and start). First targets: home / handmade sellers, then small retail.
 
 ## Phase 1: Safe to have a second tenant (code and infra, before client #2)
 
