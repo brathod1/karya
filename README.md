@@ -64,6 +64,7 @@ To put it online for someone else to use, see **[DEPLOY.md](DEPLOY.md)**.
 ```
 docs/                      Architecture, schema, configuration, flows, screens,
                            permissions, scope, design system, plan  (read these first)
+  11-commercial-readiness.md   What must exist before taking on paying clients — the live task tracker
 
 src/lib/                   Pure, shared, no I/O
   money.ts                 Integer minor units. The only money arithmetic in the codebase.

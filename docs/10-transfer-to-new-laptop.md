@@ -162,6 +162,7 @@ Production architecture: client → Vercel app → Neon `production` branch. Rea
 - **Env validation**: `src/server/env.ts` is the only reader of `process.env`; it fails fast with a clear message if `.env` is wrong.
 - The dev-only query profiler prints `[perf]` lines per request; it's off in production automatically.
 - Project docs live in `docs/01`–`09` (architecture, schema, config, flows, permissions, design system).
+- `docs/11-commercial-readiness.md` is the live task tracker for getting ready for paying clients. Update its checkboxes and commit, so every machine sees the same status.
 
 ---
 
