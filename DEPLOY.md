@@ -2,6 +2,8 @@
 
 Aimed at getting one real business using this. Read it once before starting; the whole thing takes about half an hour.
 
+> **Already deployed?** This is the first-time guide. For day-to-day releases, previews and rollback see `docs/runbooks/staging-and-releases.md`; for backups see `docs/runbooks/restore-drill.md`.
+
 ---
 
 ## Choose a host
@@ -41,7 +43,7 @@ Use a **different** value from your development one. Anyone holding it can mint 
 
 ```bash
 npm install -g vercel
-cd D:\APP
+cd <your karya folder>
 vercel
 ```
 
@@ -69,7 +71,9 @@ From your own machine, with `.env` **temporarily** pointing at the production da
 npm run db:push
 ```
 
-Do **not** run `npm run db:seed` against production. That command deletes the demo user's workspaces and recreates them; it is for development only.
+Do **not** run `npm run db:seed` against production. It refuses to run against a database that already has accounts, but it is for development only.
+
+Registration is **invitation-only** by default (`REGISTRATION` unset). To create the very first owner account on a brand-new deployment, set `REGISTRATION=open` in Vercel, redeploy, register, then remove the variable and redeploy again.
 
 ## 5. First run
 

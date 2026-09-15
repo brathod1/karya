@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { registrationOpen } from "@/server/env";
 import { LoginForm } from "./login-form";
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ reset?: string }> }) {
@@ -18,8 +19,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         from Settings → Users.
       </p>
       <p className="mt-4 text-[13px] text-ink-muted">
-        New here?{" "}
-        <Link href="/register" className="font-medium text-brand hover:underline">Create an account</Link>
+        {registrationOpen() ? "New here?" : "Been invited?"}{" "}
+        <Link href="/register" className="font-medium text-brand hover:underline">Create your account</Link>
       </p>
     </div>
   );

@@ -1,5 +1,7 @@
 # Getting this off the company laptop
 
+> **Historical (completed August 2026).** The code is on GitHub and deployed. For setting up another machine see `docs/10-transfer-to-new-laptop.md`.
+
 Right now this project exists in exactly one place — `D:\APP` on a machine that belongs to your employer. If that laptop is reimaged, reclaimed, or you simply hand it back, the code is gone. The database is not: Neon is already in the cloud, so your data survives regardless. But the code doesn't, and the accounts might.
 
 Three things to sort, in this order.

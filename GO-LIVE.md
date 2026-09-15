@@ -1,5 +1,7 @@
 # Go live — the exact steps
 
+> **Historical (completed August 2026).** This was the one-time checklist for the first deployment and refers to the old `D:\APP` folder. Current setup: `docs/10-transfer-to-new-laptop.md`. Releases: `docs/runbooks/staging-and-releases.md`.
+
 Follow top to bottom. Every command is for **PowerShell on Windows**. Each part ends with a check, so you know it worked before moving on.
 
 Total time: about 45 minutes, most of it waiting.

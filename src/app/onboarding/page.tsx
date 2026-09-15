@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser, getMemberships } from "@/server/context";
+import { logoutAction } from "@/server/actions/auth";
+import { registrationOpen } from "@/server/env";
 import { TEMPLATE_LIST } from "@/server/domain/templates";
 import { OnboardingForm } from "./onboarding-form";
 
@@ -9,6 +11,24 @@ export default async function OnboardingPage() {
 
   const existing = await getMemberships(user.id);
   const isFirst = existing.length === 0;
+
+  // Invitation-only: an account that belongs to no workspace cannot start one.
+  if (isFirst && !registrationOpen()) {
+    return (
+      <main className="min-h-dvh bg-bg">
+        <div className="mx-auto max-w-md px-5 py-16">
+          <h1 className="text-2xl font-semibold tracking-tight">You&apos;re not in a workspace yet</h1>
+          <p className="mt-2 text-sm text-ink-muted">
+            New workspaces are by invitation for now. Ask whoever runs your business&apos;s workspace to
+            invite <span className="font-medium text-ink">{user.email}</span> from Settings → Users, then sign in again.
+          </p>
+          <form action={logoutAction} className="mt-6">
+            <button type="submit" className="text-[13px] font-medium text-brand hover:underline">Sign out</button>
+          </form>
+        </div>
+      </main>
+    );
+  }
 
   const templates = TEMPLATE_LIST.map((t) => ({
     key: t.key,

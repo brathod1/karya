@@ -14,6 +14,14 @@ const schema = z.object({
   /** Public address of the deployment. Used to build reset links from the CLI. */
   APP_URL: z.string().url().optional(),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  /**
+   * Who may create an account.
+   *   "invite" — only an email address with a pending invitation. The default,
+   *              so a deployment is never open to strangers by accident.
+   *   "open"   — anyone. Only once email verification exists; see
+   *              docs/11-commercial-readiness.md (P1.2, P3.4).
+   */
+  REGISTRATION: z.enum(["invite", "open"]).default("invite"),
 });
 
 let cached: z.infer<typeof schema> | null = null;
@@ -30,3 +38,4 @@ export function env() {
 }
 
 export const isProd = () => env().NODE_ENV === "production";
+export const registrationOpen = () => env().REGISTRATION === "open";

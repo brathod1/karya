@@ -20,6 +20,18 @@ Decisions so far (15 Sep 2026):
 - **Sales approach:** local businesses first, but **self-serve**. A new business enters an email and starts, with no hand-holding required. That makes email verification, forgot-password, signup consent and first-run onboarding (P2.7, P3.1–P3.5) more urgent than originally ranked.
 - **First target:** home and handmade sellers, then small shops / retail. Research suggests handmade is the stronger place to start (see `research/2026-09-pricing.md`).
 - **Name:** "Karya" is **high risk**. An Indian company already sells SME SaaS as Karya (karya.cloud). See `research/2026-09-name-check.md`.
+- **Registration closed (15 Sep 2026):** sign-up is invitation-only (`REGISTRATION` unset = `invite`) until the Group B items are done. Existing members can still start a workspace, which is how a new business gets set up by hand.
+
+## Timing (decided 15 Sep 2026)
+
+| Group | When | Items |
+|---|---|---|
+| **A: now** | Protects the live client, cheap | Vercel preview env check + P1.6, P1.4, P1.8, P1.9, P1.11, P1.13, P1.2 no-op audit fix, P2.10, P0.2 |
+| **B: before any stranger can sign up** | Gate for reopening registration | P1.2 invitation fix, P3.1–P3.4 (blocked by name → domain), P2.1, P2.2, P2.7, P2.9, P3.5, P1.7 |
+| **C: before charging anyone** | Gate for the first invoice | P1.5, P1.3 (sooner if the restore drill shows a short window), P2.3–P2.6, P2.8, P2.11, P0.3, P0.5, P0.6, P4.1–P4.5 |
+| **D: later / on a trigger** | See each item | P1.10 (second business), **P1.12 (before December 2026)**, P3.6 + P3.7 (after P0.2), P3.8, P3.9, P3.11, P3.10, P0.4 |
+
+The chain that blocks most of B and C: **name → domain → email → verification / forgot password → open sign-up.**
 
 ---
 
@@ -52,27 +64,35 @@ Decisions so far (15 Sep 2026):
   - **Result:** 40 tests. The first run **found a real leak**: products, expenses and production lines accepted another workspace's category or payment-method id, and category settings accepted another workspace's parent. The list screens join those tables by id alone, so B would have shown A's labels. Fixed with shared checks in `src/server/domain/ownership.ts`.
   - **Production data:** a read-only query on the dev snapshot found no existing cross-workspace references.
 - [~] **P1.2 Check every server action and route for org scoping.** All server actions, `queries.ts`, `analytics.ts`, the attachment route and the pages that query directly were read during P1.1; the client-supplied-id gaps above are fixed. Remaining, lower-risk findings:
-  - **Invitations are claimed by email alone** (`claimInvitations` in `domain/members.ts`). With no email verification, anyone who registers with an invited address joins that workspace with the invited role. Inviting an address that already has an account also adds them immediately, without their consent. **Must be fixed before open self-serve signup:** email verification (P3.4) or a single-use invite link.
-  - **Audit entries on no-op archives.** `archiveCustomer` / `archiveProduct` / `archiveExpense` / `archiveEvent` / `removeCustomerPrice` / `removeProductionItem` write an audit entry even when the id isn't in the workspace. No data changes, but the audit log gains misleading rows. Low.
+  - **Invitations are claimed by email alone** (`claimInvitations` in `domain/members.ts`). With no email verification, anyone who registers with an invited address joins that workspace with the invited role. Inviting an address that already has an account also adds them immediately, without their consent. *Mitigated* while registration is invite-only: only invited addresses can register at all. **Must be fixed before reopening sign-up:** email verification (P3.4) or a single-use invite link.
+  - ~~Audit entries on no-op archives.~~ Fixed 15 Sep 2026: archive and remove functions now refuse ids outside the workspace instead of logging a change that didn't happen (covered by the isolation tests).
 - [ ] **P1.3 Paid database plan.** Upgrade Neon from free: longer point-in-time restore window, no cold-start sleep.
-- [ ] **P1.4 Restore drill.** Restore production as of a past point into a new branch, verify the data, and write the steps into a runbook.
+- [~] **P1.4 Restore drill.** Runbook written: `runbooks/restore-drill.md`. **You:** run the drill once, and record the restore window and results in its table.
 - [ ] **P1.5 Vercel Pro.** The Hobby plan is non-commercial. Move before taking money.
-- [ ] **P1.6 Staging / release flow.** Feature branch → Vercel preview deploy (pointed at the dev DB) → merge to `main`. Stop pushing untested work straight to `main`.
+- [~] **P1.6 Staging / release flow.** Runbook written: `runbooks/staging-and-releases.md`. **You:** in Vercel, make sure `DATABASE_URL` for **Preview** is the development branch (not production) and Preview has its own `AUTH_SECRET`. Then verify with a throwaway branch.
 - [ ] **P1.7 One schema-change workflow.** Use `db:generate` + `db:migrate` for production (the README still says `db:push`). Document how production migrations are applied and rolled back.
-- [ ] **P1.8 Error tracking.** Sentry (or similar) on server and client, with alerts.
-- [ ] **P1.9 Uptime monitoring.** An external check of the live URL that alerts by phone or email (e.g. UptimeRobot, Better Stack).
+- [~] **P1.8 Error tracking.** Sentry wired in (`src/instrumentation.ts`, `src/instrumentation-client.ts`, `app/error.tsx`). Errors only, no personal data, and it does nothing until a DSN is set. **You:** create a free Sentry project (Next.js), then set `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN` in Vercel (Production and Preview), redeploy, and turn on email alerts. Source-map upload is not set up, so browser stack traces stay minified; add it later if they get hard to read.
+- [~] **P1.9 Uptime monitoring.** `/api/health` added (doesn't touch the database, so it won't keep Neon awake). **You:** add a 5-minute HTTP check on `https://<live-url>/api/health` in UptimeRobot or Better Stack, alerting your phone or email.
 - [ ] **P1.10 Scheduled reconcile.** Run `db:reconcile` automatically (Vercel cron or a GitHub Action) and alert when it exits non-zero.
-- [ ] **P1.11 Security pass.**
-  - `npm audit` and dependency updates
-  - rotate `AUTH_SECRET` and the DB password if they were ever exposed
-  - review security headers
-  - confirm production env vars
-  - check attachment size limits per org
+- [~] **P1.11 Security pass.** Done 15 Sep 2026:
+  - **Dependencies:** Next.js 15.5.23 → **15.5.25**, which fixes a *critical* advisory (remote code execution in the image optimiser); `sharp` patched too.
+  - **Image proxy closed:** the config allowed any remote host through the image optimiser, but no component uses `next/image`, so it now allows none.
+  - **Headers:** baseline security headers added (`X-Frame-Options`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`, HSTS), and `X-Powered-By` removed.
+  - **Upload limits:** already enforced: 4 MB per file, type allowlist, magic-byte check, served sandboxed.
+
+  **Accepted for now:**
+  - `postcss` inside Next.js (build-time only, on our own CSS; the fix needs Next 16, a breaking upgrade).
+  - Dev-only advisories in vitest / vite / esbuild / drizzle-kit (the critical one needs `vitest --ui`, which isn't used). Upgrade vitest's major version later.
+
+  **Not done:** no per-workspace storage quota; a strict Content-Security-Policy (needs nonces). **You:** confirm Vercel env vars as part of P1.6. Rotate `AUTH_SECRET` and the DB password only if they were ever shared or exposed; the steps are in `runbooks/incident-response.md`.
 - [ ] **P1.12 Check the order-number year boundary.** `needsReset` / `renderNumber` in `src/server/domain/numbering.ts` use the server clock (UTC on Vercel), not the org's timezone. Check that an order created 00:00–05:30 IST on 1 January gets the right year, and fix it if not.
-- [ ] **P1.13 Fix out-of-date docs.**
-  - `docs/01-architecture.md` says only the local storage driver exists
-  - `.env.example` mentions an `s3` driver that isn't built
-  - `DEPLOY.md` / `GO-LIVE.md` refer to `D:\APP` and first-time setup
+- [x] **P1.13 Fix out-of-date docs.** Done 15 Sep 2026:
+  - `docs/01` storage row corrected.
+  - `DEPLOY.md` path and seed wording fixed, with pointers to the runbooks.
+  - `GO-LIVE.md` and `MOVING.md` marked historical.
+  - `docs/10` quick reference updated.
+
+  (`.env.example` was already correct; the `s3` mention is only in the local `.env` comment.)
 
 ## Phase 2: Trust and compliance (before charging anyone new)
 
@@ -96,14 +116,11 @@ Decisions so far (15 Sep 2026):
 - [ ] **P2.3 Data-processing terms.** Karya is a *processor* for the customer data clients enter; the client is the data fiduciary. State that Karya uses that data only to provide the service. This can be a clause in the Terms.
 - [ ] **P2.4 Refund / Cancellation Policy.** Indian payment gateways require it.
 - [ ] **P2.5 Contact Us page.** Real address, phone and email. Gateways check this.
-- [ ] **P2.6 Sub-processor list.** Vercel, Neon, and later the email provider and Sentry.
+- [ ] **P2.6 Sub-processor list.** Vercel, Neon, Sentry (once its DSN is set; configured to send no personal data), and later the email provider.
 - [ ] **P2.7 Consent at signup.** An "I agree to the Terms and Privacy Policy" checkbox, storing the policy version and timestamp.
 - [ ] **P2.8 Full workspace export.** One-click download of all org data as a zip of CSV/XLSX plus files: orders, items, payments, customers, products, events, expenses, attachments.
 - [ ] **P2.9 Account and workspace deletion.** Owner-initiated workspace deletion with a grace period, user account deletion, and documented backup retention. First check what exists today (`docs/06-permissions.md` mentions workspace deletion).
-- [ ] **P2.10 Data breach / incident runbook.**
-  - who to notify, and how fast (DPDP requires notifying the Board and the people affected)
-  - how to revoke sessions (`sessionVersion`)
-  - how to rotate secrets
+- [~] **P2.10 Data breach / incident runbook.** Drafted: `runbooks/incident-response.md` (severity levels, containment, secret rotation, signing people out, evidence, DPDP and CERT-In notification). **You:** fill in the contacts table. Confirm the notification duties during the P2.11 legal review.
 - [ ] **P2.11 Legal review.** One session with a CA or lawyer covering P2.1–P2.5.
 
 ## Phase 3: Usable without the developer in the loop

@@ -175,6 +175,10 @@ Production architecture: client → Vercel app → Neon `production` branch. Rea
 | Tests | `npm test` |
 | Apply schema to dev DB | `npm run db:push` (or `db:generate` + `db:migrate`) |
 | Inspect dev DB in browser | `npm run db:studio` |
-| Deploy to client | `git push origin main` (after testing!) |
+| Tenant-isolation tests (dev DB) | `npm run test:integration` |
+| Deploy to client | `git push origin main` (after testing! see `docs/runbooks/staging-and-releases.md`) |
+| Backups / emergencies | `docs/runbooks/restore-drill.md`, `docs/runbooks/incident-response.md` |
+
+Local sign-up is invitation-only like production. To register fresh test accounts locally, add `REGISTRATION="open"` to your `.env`.
 
 **15-minute happy path:** install Node + Git → new terminal → `git clone` → `npm install` → copy `.env` (verify `ep-divine-waterfall`) → `npm run dev` → done.

@@ -9,7 +9,8 @@ import { clearSessionCookie, setSessionCookie } from "@/server/session";
 import { getCurrentUser, getMemberships } from "@/server/context";
 import { createOrganization } from "@/server/domain/provisioning";
 import type { TemplateKey } from "@/server/domain/templates";
-import { claimInvitations } from "@/server/domain/members";
+import { claimInvitations, hasPendingInvitation } from "@/server/domain/members";
+import { registrationOpen } from "@/server/env";
 import { fail } from "./result";
 import { AUTH_LIMITS, clearAttempts, clientIp, guardAuthAttempt, recordAttempt } from "@/server/rate-limit";
 import { consumeResetToken } from "@/server/domain/passwordReset";
@@ -35,6 +36,16 @@ export async function registerAction(_prev: unknown, formData: FormData) {
   const [existing] = await db.select({ id: users.id }).from(users)
     .where(sql`lower(${users.email}) = ${parsed.data.email}`).limit(1);
   if (existing) return { ok: false as const, error: "An account with that email already exists." };
+
+  // Invitation-only until email verification exists: without it, anyone could
+  // sign up as any address. Checked after the throttle so it cannot be used to
+  // test addresses quickly.
+  if (!registrationOpen() && !(await hasPendingInvitation(db, parsed.data.email))) {
+    return {
+      ok: false as const,
+      error: "Sign-up is by invitation for now. If you were invited, use the exact email address the invitation was sent to.",
+    };
+  }
 
   // `redirect()` works by throwing, so it must never sit inside this try/catch.
   let joinedExistingWorkspace = false;
@@ -102,6 +113,12 @@ export async function createWorkspaceAction(_prev: unknown, formData: FormData) 
   const templateKey = String(formData.get("template") ?? "generic") as TemplateKey;
   const businessType = String(formData.get("businessType") ?? "").trim() || null;
   if (!name) return { ok: false as const, error: "Give your business a name." };
+
+  // While sign-up is invitation-only, only people already in a workspace can
+  // start another — which is also how a new business gets set up by hand.
+  if (!registrationOpen() && (await getMemberships(user.id)).length === 0) {
+    return { ok: false as const, error: "New workspaces are by invitation for now. Ask whoever runs your business's workspace to invite this email address." };
+  }
 
   try {
     const org = await createOrganization({ userId: user.id, name, templateKey, businessType });

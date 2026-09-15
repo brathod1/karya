@@ -59,6 +59,15 @@ export async function inviteMember(args: {
   });
 }
 
+/** Whether this address has an invitation still waiting to be claimed. */
+export async function hasPendingInvitation(tx: Exec, email: string): Promise<boolean> {
+  const normalised = email.trim().toLowerCase();
+  const [row] = await tx.select({ id: memberships.id }).from(memberships)
+    .where(and(isNull(memberships.userId), sql`lower(${memberships.invitedEmail}) = ${normalised}`))
+    .limit(1);
+  return !!row;
+}
+
 /** Called on register and on sign-in: turns pending invitations into real memberships. */
 export async function claimInvitations(tx: Exec, userId: string, email: string) {
   const normalised = email.trim().toLowerCase();

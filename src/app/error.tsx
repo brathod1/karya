@@ -2,7 +2,14 @@
 import { useEffect } from "react";
 
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
-  useEffect(() => { console.error(error); }, [error]);
+  useEffect(() => {
+    console.error(error);
+    // An error boundary swallows the error, so the browser's global handlers
+    // never see it. Report it explicitly; a no-op when Sentry isn't configured.
+    if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
+      void import("@sentry/nextjs").then((Sentry) => Sentry.captureException(error));
+    }
+  }, [error]);
 
   return (
     <div className="grid min-h-dvh place-items-center px-6 text-center">

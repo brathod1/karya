@@ -270,27 +270,27 @@ describe("workspace B cannot change workspace A's records", () => {
   it("customers: edit, archive and agreed prices", async () => {
     await expectUntouched(customers, A.customerId, async () => {
       expectRefused(await entityActions.updateCustomerAction(A.customerId, { name: "Changed by B" }));
-      await entityActions.archiveCustomerAction(A.customerId);
+      expectRefused(await entityActions.archiveCustomerAction(A.customerId));
       expectRefused(await entityActions.setArchivedAction("CUSTOMER", A.customerId, true));
     });
     expectRefused(await entityActions.setCustomerPriceAction({ customerId: A.customerId, productId: null, priceMinor: 1, discountPercent: null }));
     expectRefused(await entityActions.setCustomerPriceAction({ customerId: B.customerId, productId: A.productId, priceMinor: 1, discountPercent: null }));
     await expectUntouched(customerPrices, A.priceId, async () => {
-      await entityActions.removeCustomerPriceAction(A.priceId, A.customerId);
+      expectRefused(await entityActions.removeCustomerPriceAction(A.priceId, A.customerId));
     });
   });
 
   it("products: edit and archive", async () => {
     await expectUntouched(products, A.productId, async () => {
       expectRefused(await entityActions.updateProductAction(A.productId, { name: "Changed by B", defaultPriceMinor: 1 }));
-      await entityActions.archiveProductAction(A.productId);
+      expectRefused(await entityActions.archiveProductAction(A.productId));
     });
   });
 
   it("expenses: edit, archive and delete", async () => {
     await expectUntouched(expenses, A.expenseId, async () => {
       expectRefused(await entityActions.updateExpenseAction(A.expenseId, { date: new Date(), description: "Changed by B", amountMinor: 1 }));
-      await entityActions.archiveExpenseAction(A.expenseId);
+      expectRefused(await entityActions.archiveExpenseAction(A.expenseId));
       expectRefused(await entityActions.deleteRecordAction("EXPENSE", A.expenseId, "x", "x"));
     });
   });
@@ -298,12 +298,12 @@ describe("workspace B cannot change workspace A's records", () => {
   it("events and production lines", async () => {
     await expectUntouched(events, A.eventId, async () => {
       expectRefused(await entityActions.updateEventAction(A.eventId, { name: "Changed by B" }));
-      await entityActions.archiveEventAction(A.eventId);
+      expectRefused(await entityActions.archiveEventAction(A.eventId));
       expectRefused(await entityActions.addProductionItemAction(A.eventId, { productId: null, productName: "Injected", quantityPlanned: 1, unitPriceMinor: 0 }));
     });
     await expectUntouched(eventProductionItems, A.itemId, async () => {
       expectRefused(await entityActions.updateProductionItemAction(A.eventId, A.itemId, { quantityCompleted: 5 }));
-      await entityActions.removeProductionItemAction(A.eventId, A.itemId);
+      expectRefused(await entityActions.removeProductionItemAction(A.eventId, A.itemId));
     });
     expectRefused(await entityActions.addProductionItemAction(B.eventId, { productId: A.productId, quantityPlanned: 1, unitPriceMinor: 0 }));
   });

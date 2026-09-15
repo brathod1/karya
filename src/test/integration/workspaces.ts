@@ -3,7 +3,7 @@ import { and, asc, eq, like, sql } from "drizzle-orm";
 import type { PgTable } from "drizzle-orm/pg-core";
 import { db } from "@/server/db";
 import {
-  categories, customFieldDefinitions, eventProductionItems, memberships, organizations,
+  authAttempts, categories, customFieldDefinitions, eventProductionItems, memberships, organizations,
   paymentMethods, payments, statusDefinitions, users, customerPrices,
 } from "@/server/db/schema";
 import { createOrganization } from "@/server/domain/provisioning";
@@ -18,8 +18,10 @@ import { saveViewAction } from "@/server/actions/views";
 import { upsertCustomFieldAction } from "@/server/actions/settings";
 
 const SESSION_COOKIE = "karya_session";
-const ORG_NAME_PREFIX = "Isolation test ";
+export const ORG_NAME_PREFIX = "Isolation test ";
 const EMAIL_PATTERN = "isolation-%@example.test";
+/** The address `next/headers` reports in setup.ts; sign-up throttling is counted against it. */
+const TEST_CLIENT_IP = "203.0.113.10";
 
 function cookieJar(): Map<string, string> {
   const holder = globalThis as { __karyaTestCookies?: Map<string, string> };
@@ -203,6 +205,27 @@ export async function seedWorkspace(label: string): Promise<SeededWorkspace> {
 export async function removeTestData() {
   await db.delete(organizations).where(like(organizations.name, `${ORG_NAME_PREFIX}%`));
   await db.delete(users).where(like(users.email, EMAIL_PATTERN));
+  // Otherwise repeated runs within the hour trip the sign-up limit.
+  await db.delete(authAttempts).where(and(eq(authAttempts.scope, "ip"), eq(authAttempts.key, TEST_CLIENT_IP)));
+}
+
+/** An owner and an empty workspace, without the full seed. */
+export async function createOwnerWithWorkspace(label: string) {
+  const tag = randomUUID().slice(0, 8);
+  const [user] = await db.insert(users).values({
+    email: `isolation-${label.toLowerCase()}-${tag}@example.test`, name: `Isolation ${label}`, passwordHash: "not-a-usable-hash",
+  }).returning();
+  const org = await createOrganization({ userId: user.id, name: `${ORG_NAME_PREFIX}${label} ${tag}`, templateKey: "generic" });
+  return { userId: user.id, orgId: org.id, tag };
+}
+
+/** An account that belongs to no workspace — what a stranger's sign-up used to leave behind. */
+export async function createUserWithoutWorkspace(label: string) {
+  const [user] = await db.insert(users).values({
+    email: `isolation-${label.toLowerCase()}-${randomUUID().slice(0, 8)}@example.test`,
+    name: `Isolation ${label}`, passwordHash: "not-a-usable-hash",
+  }).returning();
+  return { userId: user.id, email: user.email };
 }
 
 export async function closeDatabase() {

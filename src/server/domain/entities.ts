@@ -62,7 +62,10 @@ export async function updateCustomer({ orgId, config, actor }: Base, id: string,
 
 export async function archiveCustomer({ orgId, actor }: Base, id: string) {
   return db.transaction(async (tx) => {
-    await tx.update(customers).set({ archivedAt: new Date() }).where(and(eq(customers.orgId, orgId), eq(customers.id, id)));
+    const [row] = await tx.update(customers).set({ archivedAt: new Date() })
+      .where(and(eq(customers.orgId, orgId), eq(customers.id, id))).returning({ id: customers.id });
+    // Nothing matched means nothing happened, so nothing goes in the audit log.
+    mustExist(row, "Customer");
     await logAudit(tx, { orgId, actor, action: "customer.archive", entityType: "Customer", entityId: id });
   });
 }
@@ -98,7 +101,9 @@ export async function setCustomerPrice({ orgId, actor }: Base, args: {
 
 export async function removeCustomerPrice({ orgId, actor }: Base, id: string) {
   return db.transaction(async (tx) => {
-    await tx.delete(customerPrices).where(and(eq(customerPrices.orgId, orgId), eq(customerPrices.id, id)));
+    const [row] = await tx.delete(customerPrices)
+      .where(and(eq(customerPrices.orgId, orgId), eq(customerPrices.id, id))).returning({ id: customerPrices.id });
+    mustExist(row, "Price");
     await logAudit(tx, { orgId, actor, action: "customer.price.remove", entityType: "CustomerPrice", entityId: id });
   });
 }
@@ -160,7 +165,9 @@ export async function updateProduct({ orgId, config, actor }: Base, id: string, 
 export async function archiveProduct({ orgId, actor }: Base, id: string) {
   return db.transaction(async (tx) => {
     // Soft delete only — historical orders must keep resolving this product.
-    await tx.update(products).set({ archivedAt: new Date(), isActive: false }).where(and(eq(products.orgId, orgId), eq(products.id, id)));
+    const [row] = await tx.update(products).set({ archivedAt: new Date(), isActive: false })
+      .where(and(eq(products.orgId, orgId), eq(products.id, id))).returning({ id: products.id });
+    mustExist(row, "Product");
     await logAudit(tx, { orgId, actor, action: "product.archive", entityType: "Product", entityId: id });
   });
 }
@@ -220,7 +227,9 @@ export async function updateExpense({ orgId, config, actor }: Base, id: string, 
 
 export async function archiveExpense({ orgId, actor }: Base, id: string) {
   return db.transaction(async (tx) => {
-    await tx.update(expenses).set({ archivedAt: new Date() }).where(and(eq(expenses.orgId, orgId), eq(expenses.id, id)));
+    const [row] = await tx.update(expenses).set({ archivedAt: new Date() })
+      .where(and(eq(expenses.orgId, orgId), eq(expenses.id, id))).returning({ id: expenses.id });
+    mustExist(row, "Expense");
     await logAudit(tx, { orgId, actor, action: "expense.archive", entityType: "Expense", entityId: id });
   });
 }
@@ -269,7 +278,9 @@ export async function updateEvent({ orgId, actor }: Base, id: string, input: Eve
 
 export async function archiveEvent({ orgId, actor }: Base, id: string) {
   return db.transaction(async (tx) => {
-    await tx.update(events).set({ archivedAt: new Date() }).where(and(eq(events.orgId, orgId), eq(events.id, id)));
+    const [row] = await tx.update(events).set({ archivedAt: new Date() })
+      .where(and(eq(events.orgId, orgId), eq(events.id, id))).returning({ id: events.id });
+    mustExist(row, "Event");
     await logAudit(tx, { orgId, actor, action: "event.archive", entityType: "Event", entityId: id });
   });
 }
@@ -357,7 +368,9 @@ export async function updateProductionItem({ orgId, config, actor }: Base, itemI
 
 export async function removeProductionItem({ orgId, actor }: Base, itemId: string) {
   return db.transaction(async (tx) => {
-    await tx.delete(eventProductionItems).where(and(eq(eventProductionItems.orgId, orgId), eq(eventProductionItems.id, itemId)));
+    const [row] = await tx.delete(eventProductionItems)
+      .where(and(eq(eventProductionItems.orgId, orgId), eq(eventProductionItems.id, itemId))).returning({ id: eventProductionItems.id });
+    mustExist(row, "Production line");
     await logAudit(tx, { orgId, actor, action: "event.item.delete", entityType: "EventProductionItem", entityId: itemId });
   });
 }
